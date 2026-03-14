@@ -668,7 +668,8 @@ export default function App() {
             <div className="total-card">
               <div className="total-label">Wrong SUS</div>
               <div className="total-value">{lobby.results.totals.susWrong}</div>
-                      </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -954,10 +955,10 @@ export default function App() {
             )}
           </div>
         </div>
-        </div>
       </div>
     );
   }
+
   function renderFeedTab() {
     return (
       <div className="tab-screen">
