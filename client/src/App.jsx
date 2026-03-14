@@ -955,9 +955,10 @@ export default function App() {
             )}
           </div>
         </div>
-      );
+        </div>
+      </div>
+    );
   }
-
   function renderFeedTab() {
     return (
       <div className="tab-screen">
