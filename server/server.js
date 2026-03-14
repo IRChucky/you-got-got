@@ -4,19 +4,6 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 
 const app = express();
-app.use(cors());
-
-const server = http.createServer(app);
-
-const ALLOWED_ORIGIN =
-  process.env.CLIENT_URL || process.env.CORS_ORIGIN || "*";
-
-const io = new Server(server, {
-  cors: {
-    origin: ALLOWED_ORIGIN,
-    methods: ["GET", "POST"],
-  },
-});
 
 const PORT = process.env.PORT || 3001;
 const MAX_FEED_ITEMS = 40;
@@ -31,12 +18,84 @@ const DEFAULT_SETTINGS = {
 const lobbies = {};
 const chaosTimers = {};
 
+function normalizeOrigin(value) {
+  if (!value) return "";
+  return String(value).trim().replace(/\/+$/, "");
+}
+
+function buildAllowedOrigins() {
+  const raw = [
+    process.env.CLIENT_URL,
+    process.env.CORS_ORIGIN,
+    process.env.FRONTEND_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+  ];
+
+  return [...new Set(raw.map(normalizeOrigin).filter(Boolean))];
+}
+
+const allowedOrigins = buildAllowedOrigins();
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+
+  const cleanOrigin = normalizeOrigin(origin);
+
+  if (allowedOrigins.includes(cleanOrigin)) return true;
+
+  try {
+    const url = new URL(cleanOrigin);
+    if (url.hostname.endsWith(".vercel.app")) return true;
+    if (url.hostname.endsWith(".onrender.com")) return true;
+  } catch (error) {
+    return false;
+  }
+
+  return false;
+}
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    methods: ["GET", "POST"],
+  })
+);
+
 app.get("/", (_req, res) => {
   res.send("You Got Got server is running");
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, status: "healthy" });
+  res.json({
+    ok: true,
+    status: "healthy",
+    allowedOrigins,
+  });
+});
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin(origin, callback) {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Socket.IO CORS blocked for origin: ${origin}`));
+    },
+    methods: ["GET", "POST"],
+  },
 });
 
 function generateLobbyCode() {
@@ -949,5 +1008,5 @@ io.on("connection", (socket) => {
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Allowed client origin: ${ALLOWED_ORIGIN}`);
+  console.log("Allowed origins:", allowedOrigins);
 });
